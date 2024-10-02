@@ -129,6 +129,7 @@ class afc:
 
         self.gcode.register_command('TEST', self.cmd_TEST, desc=self.cmd_TEST_help)
         self.gcode.register_command('HUB_CUT_TEST', self.cmd_HUB_CUT_TEST, desc=self.cmd_HUB_CUT_TEST_help)
+        self.gcode.register_command('_AFC_FORM_TIP', self.cmd_FORM_TIP, desc=self.cmd_FORM_TIP_help)
 
         self.VarFile = config.get('VarFile')
         
@@ -617,7 +618,7 @@ class afc:
         if self.form_tip:
             if self.park: self.gcode.run_script_from_command(self.park_cmd)
             if self.form_tip_cmd == "AFC":
-                self.afc_tip_form()
+                self.gcode.run_script_from_command('_AFC_FORM_TIP')
             else:
                 self.gcode.run_script_from_command(self.form_tip_cmd)
 
@@ -746,7 +747,15 @@ class afc:
         self.toolhead.manual_move(pos, speed)
         self.toolhead.wait_moves()
 
-    def afc_tip_form(self):
+    cmd_FORM_TIP_help = "Run tip forming"
+    def cmd_FORM_TIP(self, gcmd):
+        cooling_tube_position = gcmd.get_float('CT_POS', self.cooling_tube_position)
+        cooling_tube_length = gcmd.get_float('CT_LEN', self.cooling_tube_length)
+        unloading_speed = gcmd.get_float('SPEED', self.unloading_speed)
+        unloading_speed_start = gcmd.get_float('SPEED_START', self.unloading_speed_start)
+        cooling_moves = gcmd.get_int('COOL_MOVES', self.cooling_moves)
+        initial_cooling_speed = gcmd.get_float('INITIAL_COOL_SPEED', self.initial_cooling_speed)
+        final_cooling_speed = gcmd.get_float('FINAL_COOL_SPEED', self.final_cooling_speed)
         step = 1
         if self.ramming_volume > 0:
             self.gcode.respond_info('AFC-TIP-FORM: Step ' + str(step) + ': Ramming')
@@ -768,12 +777,12 @@ class afc:
             step +=1
 
         self.gcode.respond_info('AFC-TIP-FORM: Step ' + str(step) + ': Retraction & Nozzle Separation')
-        total_retraction_distance = self.cooling_tube_position + self.cooling_tube_length - 15
-        self.afc_extrude(-15, self.unloading_speed_start * 60)
+        total_retraction_distance = cooling_tube_position + cooling_tube_length - 15
+        self.afc_extrude(-15, unloading_speed_start * 60)
         if total_retraction_distance > 0:
-            self.afc_extrude(.7 * total_retraction_distance, 1.0 * self.unloading_speed)
-            self.afc_extrude(.2 * total_retraction_distance, 0.5 * self.unloading_speed)
-            self.afc_extrude(.1 * total_retraction_distance, 0.3 * self.unloading_speed)
+            self.afc_extrude(-.7 * total_retraction_distance, 1.0 * unloading_speed * 60)
+            self.afc_extrude(-.2 * total_retraction_distance, 0.5 * unloading_speed * 60)
+            self.afc_extrude(-.1 * total_retraction_distance, 0.3 * unloading_speed * 60)
         
         if self.toolchange_temp > 0:
             if self.use_skinnydip:
@@ -785,11 +794,11 @@ class afc:
             pheaters.set_temperature(extruder.get_heater(), self.toolchange_temp, wait)
         step +=1
         self.gcode.respond_info('AFC-TIP-FORM: Step ' + str(step) + ': Cooling Moves')
-        speed_inc = (self.final_cooling_speed - self.initial_cooling_speed) / (2 * self.cooling_moves - 1)
-        for move in range(self.cooling_moves):
-            speed = self.initial_cooling_speed + speed_inc * move * 2
-            self.afc_extrude(self.cooling_tube_length, speed * 60)
-            self.afc_extrude(self.cooling_tube_length * -1, (speed + speed_inc) * 60)
+        speed_inc = (final_cooling_speed - initial_cooling_speed) / (2 * cooling_moves - 1)
+        for move in range(cooling_moves):
+            speed = initial_cooling_speed + speed_inc * move * 2
+            self.afc_extrude(cooling_tube_length, speed * 60)
+            self.afc_extrude(cooling_tube_length * -1, (speed + speed_inc) * 60)
         step += 1
 
         if self.use_skinnydip:
