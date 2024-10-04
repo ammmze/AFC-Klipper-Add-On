@@ -4,20 +4,10 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
-from ast import Str
-import math, logging
-import chelper
-import copy
 import os 
 import time
 import json
-import toolhead
-import stepper
 from configparser import Error as error
-from kinematics import extruder
-from . import stepper_enable, output_pin
-from urllib.request import urlopen
-from extras.heaters import Heater
 
 class afc:
     def __init__(self, config):
@@ -63,7 +53,7 @@ class afc:
         self.hub_cut_servo_pass_angle = config.getfloat("hub_cut_servo_pass_angle", 0)
         self.hub_cut_servo_clip_angle = config.getfloat("hub_cut_servo_clip_angle", 160)
         self.hub_cut_servo_prep_angle = config.getfloat("hub_cut_servo_prep_angle", 75)
-        self.hub_cut_confirm = config.getfloat("hub_cut_confirm", 0);
+        self.hub_cut_confirm = config.getfloat("hub_cut_confirm", 0)
 
         # TOOL Cutting Settings
         self.tool = ''
@@ -400,7 +390,6 @@ class afc:
                                         break
                                 CUR_LANE.status = None
                                 self.current = None
-                                reload_attempts = 0
                                 x = 0
                                 while CUR_LANE.load_state == False:
                                     CUR_LANE.move( self.hub_move_dis, self.short_moves_speed, self.short_moves_accel)
@@ -515,7 +504,6 @@ class afc:
         lane = gcmd.get('LANE', None)
         CUR_LANE = self.printer.lookup_object('AFC_stepper ' + lane)
         CUR_LANE.status = 'loading'
-        led_cont=CUR_LANE.led_index.split(':')
         self.afc_led(self.led_loading, CUR_LANE.led_index)
         if CUR_LANE.load_state == True and self.hub.filament_present == False:
             if self.hub_cut_active:
@@ -612,7 +600,7 @@ class afc:
         else:
             #callout if hub is triggered when trying to load
             if self.hub.filament_present == True:
-                msg = ('HUB NOT CLEAR TRYING TO LOAD ' + CUR_LANE,name.upper() + '\n||-----||----|x|-----||\nTRG   LOAD   HUB   TOOL')
+                msg = ('HUB NOT CLEAR TRYING TO LOAD ' + CUR_LANE.name.upper() + '\n||-----||----|x|-----||\nTRG   LOAD   HUB   TOOL')
                 self.respond_error(msg, raise_error=False)
                 self.gcode.run_script_from_command('PAUSE')
                 self.afc_led(self.led_ready, CUR_LANE.led_index)
@@ -638,7 +626,6 @@ class afc:
         lane = gcmd.get('LANE', self.current)
         CUR_LANE = self.printer.lookup_object('AFC_stepper '+ lane)
         CUR_LANE.status = 'unloading'
-        led_cont = CUR_LANE.led_index.split(':')
         self.afc_led(self.led_unloading, CUR_LANE.led_index)
         CUR_LANE.extruder_stepper.sync_to_extruder(CUR_LANE.extruder_name)
         
